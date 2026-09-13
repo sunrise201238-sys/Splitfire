@@ -147,7 +147,7 @@ export function createBot(player: PlayerId, difficulty: Difficulty | BotConfig =
     if (me.target || me.fuel < 8 || world.tick - lastMoveTick < 45) return null;
     const threats = incomingAt(world, me.y + HULL_TOP);
     const here = threatsOn(threats, me.x);
-    if (here < 3) return null;
+    if (here < 6) return null;
     const soonest = Math.min(...threats.map((t) => t.ticks));
     if (soonest < 12) return null; // too late to matter
     let best: { x: number; y: number; m: number; cost: number } | null = null;

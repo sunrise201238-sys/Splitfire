@@ -24,6 +24,8 @@ export interface Ship {
   ammo: Partial<Record<MunitionKind, number>>;
   /** Movement destination, or null when idle. */
   target: { x: number; y: number } | null;
+  /** Salvo in progress: shells still to launch from the last trigger pull. */
+  salvo: { kind: MunitionKind; remaining: number; index: number; vx: number; vy: number; nextTick: number } | null;
   bounds: Bounds;
   alive: boolean;
 }
@@ -70,7 +72,7 @@ export type Input =
   | { type: 'move'; player: PlayerId; x: number; y: number };
 
 export type SimEvent =
-  | { type: 'fire'; player: PlayerId; kind: MunitionKind; x: number; y: number }
+  | { type: 'fire'; player: PlayerId; kind: MunitionKind; x: number; y: number; first: boolean }
   | { type: 'split'; player: PlayerId; kind: MunitionKind; x: number; y: number; count: number }
   | { type: 'annihilate'; x: number; y: number; mass: number }
   | { type: 'shipHit'; player: PlayerId; x: number; y: number; damage: number }

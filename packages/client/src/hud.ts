@@ -12,15 +12,16 @@ export interface Rect {
 
 export const CHIP_W = 92;
 export const CHIP_H = 42;
-export const IGNITE_R = 34;
 
 export const HUD = {
   chip(i: number): Rect {
     return { x: 24 + i * 102, y: LH - 66, w: CHIP_W, h: CHIP_H };
   },
-  ignite: { x: LW / 2, y: LH - 72 },
+  move: { x: 24 + 3 * 102 + 18, y: LH - 66, w: CHIP_W, h: CHIP_H } as Rect,
   cam: { x: LW - 124, y: 18, w: 106, h: 32 } as Rect,
   fuel: { x: 24, y: LH - 108 },
+  /** Where transient hints sit: bottom centre, clear of the chips. */
+  hint: { x: LW / 2, y: LH - 46 },
 };
 
 export function inRect(r: Rect, x: number, y: number): boolean {
@@ -43,9 +44,7 @@ export function chipHit(x: number, y: number): MunitionKind | null {
 export interface HudState {
   ship: Ship;
   selected: MunitionKind;
-  igniteActive: boolean;
-  /** 0..1 pulse phase for the active ignite button. */
-  pulse: number;
+  moveMode: boolean;
   autoCam: boolean;
   fuelAlpha: number;
   fuelCost: number;
@@ -87,34 +86,27 @@ export function drawHud(ctx: CanvasRenderingContext2D, s: HudState): void {
   }
 
   {
-    const { x, y } = HUD.ignite;
-    const on = s.igniteActive;
+    const r = HUD.move;
+    const on = s.moveMode;
+    const canMove = s.ship.fuel > 0;
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(r.x, r.y);
+    roundRect(ctx, 0, 0, r.w, r.h, 10);
     if (on) {
-      ctx.strokeStyle = `rgba(${C.meRgb},${0.5 * (1 - s.pulse)})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, IGNITE_R + 4 + s.pulse * 16, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = `rgba(${C.meRgb},0.22)`;
-      ctx.beginPath();
-      ctx.arc(0, 0, IGNITE_R, 0, Math.PI * 2);
+      ctx.fillStyle = C.me;
       ctx.fill();
-    }
-    ctx.strokeStyle = on ? C.me : C.hudFaint;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, IGNITE_R, 0, Math.PI * 2);
-    ctx.stroke();
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * 7, Math.sin(a) * 7);
-      ctx.lineTo(Math.cos(a) * 15, Math.sin(a) * 15);
+    } else {
+      ctx.strokeStyle = canMove ? C.hudDim : C.hudFaint;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-    text(ctx, on ? 'TAP TO SPLIT' : 'SPLIT', 0, 50, 12, on ? C.hud : C.hudFaint);
+    text(ctx, 'MOVE', 12, 18, 16, on ? C.bg : canMove ? C.hud : C.hudFaint, 600, 'left');
+    // Mini fuel gauge inside the chip.
+    const frac = s.ship.fuel / s.ship.maxFuel;
+    ctx.fillStyle = on ? 'rgba(11,16,32,0.25)' : 'rgba(255,255,255,0.12)';
+    ctx.fillRect(12, 31, r.w - 24, 4);
+    ctx.fillStyle = on ? C.bg : C.me;
+    ctx.fillRect(12, 31, (r.w - 24) * frac, 4);
     ctx.restore();
   }
 

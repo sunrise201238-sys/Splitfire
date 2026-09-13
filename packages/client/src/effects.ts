@@ -30,7 +30,7 @@ export class Effects {
           this.push({ kind: 'fire', x: e.x, y: e.y, t0: now, life: 0.18, col: e.player === me ? C.me : C.foe, seed: this.seed++, size: 1 });
           break;
         case 'split': {
-          const big = e.count >= 15 ? 1.4 : e.count >= 8 ? 1.15 : 1;
+          const big = e.count >= 15 ? 1.2 : e.count >= 8 ? 0.95 : 0.7;
           this.push({ kind: 'split', x: e.x, y: e.y, t0: now, life: 0.65, col: e.player === me ? C.me : C.foe, seed: this.seed++, size: big });
           if (e.count >= 15) shake += 1.5;
           break;

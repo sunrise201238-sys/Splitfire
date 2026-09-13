@@ -31,6 +31,8 @@ export function hashWorld(w: World): number {
       mix(s.target.x);
       mix(s.target.y);
     }
+    mixInt(s.salvo ? s.salvo.remaining : 0);
+    mixInt(s.salvo ? s.salvo.nextTick : 0);
   }
   for (const s of w.shells) {
     mixInt(s.id);

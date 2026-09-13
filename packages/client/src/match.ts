@@ -26,7 +26,7 @@ import {
 import { Camera } from './camera';
 import { drawBundle, drawCone, drawDebris, drawDotted, drawDragUI, drawEdgeArrow, drawHpBar, drawLaunchArrow, drawPath, drawShell, drawShip, drawSplitMarker, roundRect, text } from './draw';
 import { Effects } from './effects';
-import { HUD, IGNITE_R, chipHit, drawHud, inCircle, inRect, type Rect } from './hud';
+import { HUD, chipHit, drawHud, inRect, type Rect } from './hud';
 import { C, LH, LW } from './palette';
 import type { App, PointerInfo, Screen } from './screen';
 import { Starfield } from './starfield';
@@ -34,7 +34,6 @@ import { Starfield } from './starfield';
 const AIM_SCALE = 1.6;
 const HINT_SHOTS = 3;
 const MIN_DRAG = 12;
-const SHIP_GRAB_RADIUS = 52;
 const MAX_TICKS_PER_FRAME = 6;
 const OVERLAY_DELAY = 1.4;
 
@@ -73,6 +72,7 @@ export class MatchScreen implements Screen {
   private now = 0;
   private shotsFired = 0;
   private lastFireAt = -10;
+  private moveMode = false;
 
   constructor(
     private readonly app: App,
@@ -126,7 +126,7 @@ export class MatchScreen implements Screen {
     const shake = this.effects.spawn(this.world.events, now, this.me);
     if (shake > 0) this.camera.addShake(shake);
     for (const e of this.world.events) {
-      if (e.type === 'fire' && e.player === this.me) {
+      if (e.type === 'fire' && e.player === this.me && e.first) {
         this.shotsFired++;
         this.lastFireAt = now;
       }
@@ -187,7 +187,7 @@ export class MatchScreen implements Screen {
     this.stars.drawPlanet(ctx);
 
     // Movement affordances.
-    if (this.drag?.mode === 'move') {
+    if (this.moveMode || this.drag?.mode === 'move') {
       const b = this.ship.bounds;
       ctx.setLineDash([6, 6]);
       ctx.strokeStyle = `rgba(${C.meRgb},0.35)`;
@@ -281,19 +281,19 @@ export class MatchScreen implements Screen {
       const t = clampToBounds(this.ship.bounds, this.drag.cx, this.drag.cy);
       fuelCost = (Math.hypot(t.x - this.ship.x, t.y - this.ship.y) * FUEL_PER_UNIT) / this.ship.maxFuel;
     }
-    const unsplit = this.hasUnsplit();
     drawHud(ctx, {
       ship: this.ship,
       selected: this.selected,
-      igniteActive: unsplit,
-      pulse: (now * 1.4) % 1,
+      moveMode: this.moveMode,
       autoCam: this.camera.auto,
       fuelAlpha: showFuel ? 1 : 0,
       fuelCost,
     });
-    if (unsplit && this.shotsFired <= HINT_SHOTS && now - this.lastFireAt < 4) {
+    if (this.moveMode) {
+      text(ctx, 'tap or drag where to go', HUD.hint.x, HUD.hint.y, 16, C.hud, 600);
+    } else if (this.hasUnsplit() && this.shotsFired <= HINT_SHOTS && now - this.lastFireAt < 4) {
       const a = 0.6 + 0.4 * Math.sin(now * 6);
-      text(ctx, 'tap anywhere to split early', LW / 2, HUD.ignite.y - IGNITE_R - 26, 16, `rgba(230,233,245,${a})`, 600);
+      text(ctx, 'tap anywhere to split early', HUD.hint.x, HUD.hint.y, 16, `rgba(230,233,245,${a})`, 600);
     }
 
     if (this.overAt !== null && now - this.overAt > OVERLAY_DELAY) this.drawOverlay(ctx);
@@ -366,8 +366,8 @@ export class MatchScreen implements Screen {
       this.selected = kind;
       return;
     }
-    if (inCircle(HUD.ignite.x, HUD.ignite.y, IGNITE_R + 8, p.x, p.y)) {
-      this.ignite();
+    if (inRect(HUD.move, p.x, p.y)) {
+      this.moveMode = !this.moveMode && this.ship.fuel > 0;
       return;
     }
     if (inRect(HUD.cam, p.x, p.y)) {
@@ -380,8 +380,8 @@ export class MatchScreen implements Screen {
     }
     if (this.world.winner !== null || !this.ship.alive) return;
 
-    const wp = this.camera.screenToWorld(p.x, p.y);
-    if (Math.hypot(wp.x - this.ship.x, wp.y - this.ship.y) < SHIP_GRAB_RADIUS) {
+    if (this.moveMode) {
+      const wp = this.camera.screenToWorld(p.x, p.y);
       this.drag = { mode: 'move', id: p.id, cx: wp.x, cy: wp.y };
       return;
     }
@@ -437,15 +437,15 @@ export class MatchScreen implements Screen {
     if (!d || d.id !== p.id) return;
     this.drag = null;
     if (d.mode === 'aim') {
-      if (Math.hypot(d.sx - d.cx, d.sy - d.cy) < MIN_DRAG) {
-        // A tap, not a drag: split whatever is still in one piece.
+      const v = this.aimVelocity(d);
+      if (Math.hypot(d.sx - d.cx, d.sy - d.cy) < MIN_DRAG || Math.hypot(v.vx, v.vy) < MIN_LAUNCH_SPEED * 0.6) {
+        // A tap (or a drag too short to be a shot): split whatever is still in one piece.
         this.ignite();
         return;
       }
-      const v = this.aimVelocity(d);
-      if (Math.hypot(v.vx, v.vy) < MIN_LAUNCH_SPEED * 0.6) return;
       this.queue({ type: 'fire', player: this.me, kind: this.selected, vx: v.vx, vy: v.vy });
     } else if (d.mode === 'move') {
+      this.moveMode = false;
       const t = clampToBounds(this.ship.bounds, d.cx, d.cy);
       if (Math.hypot(t.x - this.ship.x, t.y - this.ship.y) < 8) return;
       this.queue({ type: 'move', player: this.me, x: t.x, y: t.y });
@@ -470,12 +470,16 @@ export class MatchScreen implements Screen {
       case 'KeyC':
         this.camera.setAuto(!this.camera.auto);
         break;
+      case 'KeyM':
+        this.moveMode = !this.moveMode && this.ship.fuel > 0;
+        break;
       case 'KeyR':
         this.camera.setAuto(false);
         this.camera.resetView();
         break;
       case 'Escape':
         if (this.drag) this.cancelDrag();
+        else if (this.moveMode) this.moveMode = false;
         else if (this.overAt !== null) this.showMenu();
         break;
       default:

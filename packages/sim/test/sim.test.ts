@@ -67,6 +67,10 @@ describe('firing', () => {
     step(w, [{ type: 'fire', player: 0, kind: 'x5', vx: 200, vy: -200 }]);
     expect(w.shells.length).toBe(1);
     expect(w.ships[0].ammo.x10).toBe(9);
+    // The rest of the salvo follows on its own, one volley costing one round of ammo.
+    for (let t = 0; t < 30; t++) step(w, []);
+    expect(w.shells.filter((s) => s.parent).length).toBe(MUNITIONS.x10.salvo);
+    expect(w.ships[0].ammo.x10).toBe(9);
   });
 
   it('refuses finite munitions once they run out', () => {
@@ -81,18 +85,25 @@ describe('cluster split', () => {
   it('splits at the apex into the full child count', () => {
     const w = createWorld(3);
     step(w, [{ type: 'fire', player: 0, kind: 'x10', vx: 170, vy: -200 }]);
-    let splitEvent = null;
-    for (let t = 0; t < 120 && !splitEvent; t++) {
+    let splits = 0;
+    for (let t = 0; t < 150 && splits === 0; t++) {
       step(w, []);
-      splitEvent = w.events.find((e) => e.type === 'split') ?? null;
+      splits += w.events.filter((e) => e.type === 'split').length;
     }
-    expect(splitEvent).not.toBeNull();
-    const children = w.shells.filter((s) => !s.parent);
-    expect(children.length).toBe(10);
-    expect(w.shells.some((s) => s.parent)).toBe(false);
+    expect(splits).toBe(1);
     // The fan is symmetric about the parent's direction at the apex, which is horizontal.
-    const meanVy = children.reduce((a, s) => a + s.vy, 0) / children.length;
+    const firstFan = w.shells.filter((s) => !s.parent);
+    expect(firstFan.length).toBe(10);
+    const meanVy = firstFan.reduce((a, s) => a + s.vy, 0) / firstFan.length;
     expect(Math.abs(meanVy)).toBeLessThan(15);
+    // Every shell of the salvo splits on its own.
+    for (let t = 0; t < 150 && splits < MUNITIONS.x10.salvo; t++) {
+      step(w, []);
+      splits += w.events.filter((e) => e.type === 'split').length;
+    }
+    expect(splits).toBe(MUNITIONS.x10.salvo);
+    expect(w.shells.filter((s) => !s.parent).length).toBe(10 * MUNITIONS.x10.salvo);
+    expect(w.shells.some((s) => s.parent)).toBe(false);
   });
 
   it('ignites early on request', () => {
@@ -101,6 +112,7 @@ describe('cluster split', () => {
     step(w, []);
     step(w, [{ type: 'ignite', player: 0 }]);
     expect(w.events.some((e) => e.type === 'split')).toBe(true);
+    // Only the first shell of the salvo was airborne; it split into five.
     expect(w.shells.filter((s) => !s.parent).length).toBe(5);
   });
 

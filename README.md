@@ -22,16 +22,17 @@ Open the printed URL. Landscape works best; the battlefield is letterboxed on ot
 | --- | --- | --- |
 | Aim and fire | Drag anywhere (pull back like a slingshot), release | Same |
 | Choose munition | Click a chip, or keys 1 2 3 | Tap a chip |
-| Split early | Tap anywhere, the SPLIT button, or Space | Tap anywhere |
-| Move your ship | Drag starting on your ship | Same |
+| Split early | Tap anywhere, or Space | Tap anywhere |
+| Move your ship | MOVE chip (or M), then click or drag where to go | MOVE, then tap where to go |
 | Zoom | Mouse wheel | Pinch |
 | Pan | Right-button drag | Two-finger drag |
 | Director camera (on by default) | AUTO CAM chip, or C | Tap AUTO CAM |
 | Reset view | R | |
 
-Munitions: ×5 is unlimited with a 2 s cooldown, ×10 has 10 shots and a 5 s cooldown, ×20 has
-5 shots and a 10 s cooldown. The launcher is shared, so firing anything starts that munition's
-cooldown. Fuel is limited; moving spends it.
+Every trigger pull fires a salvo of four shells in quick succession, and each shell splits into
+its own fan. Munitions: ×5 is unlimited with a 2 s cooldown, ×10 has 10 salvos and a 5 s
+cooldown, ×20 has 5 salvos and a 10 s cooldown. The launcher is shared, so firing anything starts
+that munition's cooldown. Fuel is limited; moving spends it.
 
 ## Repository layout
 

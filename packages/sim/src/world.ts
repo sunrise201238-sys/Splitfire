@@ -1,10 +1,10 @@
 import { clamp, len, rotate } from './dmath';
-import { CHILD_MASS, CHILD_RADIUS, DT, MUNITIONS, STREAM_SPEED_SPREAD, type MunitionKind } from './munitions';
+import { CHILD_MASS, CHILD_RADIUS, DT, MUNITIONS, SALVO_SPACING_TICKS, SALVO_SPEED_STEP, STREAM_SPEED_SPREAD, type MunitionKind } from './munitions';
 import { WORLD_H, WORLD_W, integrate, outOfField } from './physics';
 import { createRng, rngInt, rngRange } from './rng';
 import type { Bounds, Debris, Input, PlayerId, Shell, Ship, World } from './types';
 
-export const SHIP_MAX_HP = 80;
+export const SHIP_MAX_HP = 200;
 export const SHIP_MAX_FUEL = 100;
 export const SHIP_MOVE_SPEED = 70; // units per second
 export const FUEL_PER_UNIT = 0.25; // fuel spent per unit of distance
@@ -47,6 +47,7 @@ function createShip(player: PlayerId): Ship {
     cooldown: 0,
     ammo,
     target: null,
+    salvo: null,
     bounds: { ...s.bounds },
     alive: true,
   };
@@ -158,23 +159,10 @@ function applyInput(world: World, input: Input): void {
       if (!canFire(ship, input.kind)) return;
       const def = MUNITIONS[input.kind];
       const v = clampLaunch(input.vx, input.vy);
-      const p = launchPoint(ship);
-      world.shells.push({
-        id: world.nextId++,
-        owner: ship.player,
-        kind: input.kind,
-        x: p.x,
-        y: p.y,
-        vx: v.vx,
-        vy: v.vy,
-        mass: def.children,
-        radius: def.radius,
-        parent: true,
-        age: 0,
-      });
       ship.cooldown = def.cooldownTicks;
       if (def.ammo !== null) ship.ammo[input.kind] = (ship.ammo[input.kind] ?? 0) - 1;
-      world.events.push({ type: 'fire', player: ship.player, kind: input.kind, x: p.x, y: p.y });
+      ship.salvo = { kind: input.kind, remaining: def.salvo, index: 0, vx: v.vx, vy: v.vy, nextTick: world.tick };
+      launchNext(world, ship);
       return;
     }
     case 'ignite': {
@@ -195,10 +183,38 @@ function applyInput(world: World, input: Input): void {
   }
 }
 
+/** Launch the next shell of the ship's salvo, if one is due. */
+function launchNext(world: World, ship: Ship): void {
+  const sv = ship.salvo;
+  if (!sv || world.tick < sv.nextTick) return;
+  const def = MUNITIONS[sv.kind];
+  const p = launchPoint(ship);
+  const mul = 1 - SALVO_SPEED_STEP * sv.index;
+  world.shells.push({
+    id: world.nextId++,
+    owner: ship.player,
+    kind: sv.kind,
+    x: p.x,
+    y: p.y,
+    vx: sv.vx * mul,
+    vy: sv.vy * mul,
+    mass: def.children,
+    radius: def.radius,
+    parent: true,
+    age: 0,
+  });
+  world.events.push({ type: 'fire', player: ship.player, kind: sv.kind, x: p.x, y: p.y, first: sv.index === 0 });
+  sv.index++;
+  sv.remaining--;
+  sv.nextTick = world.tick + SALVO_SPACING_TICKS;
+  if (sv.remaining <= 0) ship.salvo = null;
+}
+
 function stepShips(world: World): void {
   for (const ship of world.ships) {
     if (!ship.alive) continue;
     if (ship.cooldown > 0) ship.cooldown--;
+    launchNext(world, ship);
     if (!ship.target) continue;
     const dx = ship.target.x - ship.x;
     const dy = ship.target.y - ship.y;
@@ -320,6 +336,7 @@ function stepCollisions(world: World): void {
       target.hp = 0;
       target.alive = false;
       target.target = null;
+      target.salvo = null;
       world.events.push({ type: 'shipDestroyed', player: target.player, x: target.x, y: target.y });
       if (world.winner === null) world.winner = target.player === 0 ? 1 : 0;
     }
