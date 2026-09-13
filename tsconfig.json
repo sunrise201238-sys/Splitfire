@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@splitfire/sim": ["packages/sim/src/index.ts"],
+      "@splitfire/bot": ["packages/bot/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src", "packages/*/test", "packages/client/vite.config.ts", "vitest.config.ts"]
+}
