@@ -1,8 +1,9 @@
-import { MUNITIONS, type MunitionKind } from './munitions';
+import { MUNITIONS, STREAM_SPEED_SPREAD, type MunitionKind } from './munitions';
 import { integrate, outOfField } from './physics';
 import type { Body } from './physics';
 import type { PlayerId, World } from './types';
 import { childVelocities, clampLaunch, launchPoint } from './world';
+import { rotate } from './dmath';
 
 export interface Pt {
   x: number;
@@ -20,6 +21,11 @@ export interface Preview {
   landing: { x0: number; x1: number; y: number } | null;
   /** True if the parent path passes through a debris chunk. */
   blocked: boolean;
+  /**
+   * Outer edges of the fan: the fastest child on each angular edge. Everything the
+   * split produces lands inside the polygon these two paths enclose.
+   */
+  envelope: { top: Pt[]; bottom: Pt[] } | null;
 }
 
 const MAX_PARENT_TICKS = 300;
@@ -74,7 +80,22 @@ export function previewShot(
 
   const children: Pt[][] = [];
   let landing: Preview['landing'] = null;
+  let envelope: Preview['envelope'] = null;
   if (apex) {
+    const fast = 1 + STREAM_SPEED_SPREAD / 2;
+    const edge = (angle: number): Pt[] => {
+      const r = rotate(body.vx, body.vy, angle);
+      const c: Body = { x: apex!.x, y: apex!.y, vx: r.x * fast, vy: r.y * fast };
+      const cp: Pt[] = [{ x: c.x, y: c.y }];
+      for (let t = 0; t < MAX_CHILD_TICKS; t++) {
+        const py = c.y;
+        integrate(world, c);
+        cp.push({ x: c.x, y: c.y });
+        if ((py < enemy.y && c.y >= enemy.y) || outOfField(c.x, c.y)) break;
+      }
+      return cp;
+    };
+    envelope = { top: edge(-def.spread / 2), bottom: edge(def.spread / 2) };
     const vels = childVelocities(kind, body.vx, body.vy, def.children);
     let x0 = Infinity;
     let x1 = -Infinity;
@@ -98,7 +119,7 @@ export function previewShot(
     }
     if (x0 !== Infinity) landing = { x0, x1, y: enemy.y };
   }
-  return { path, apex, children, landing, blocked };
+  return { path, apex, children, landing, blocked, envelope };
 }
 
 export interface Crossing {

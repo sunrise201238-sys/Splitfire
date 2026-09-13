@@ -43,12 +43,12 @@ export class Effects {
             break;
           }
           this.push({ kind: 'annihilate', x: e.x, y: e.y, t0: now, life: 0.38, col: C.white, seed: this.seed++, size: 0.6 + Math.min(1, e.mass * 0.15) });
-          if (e.mass >= 5) shake += 1.5;
+          if (e.mass >= 3) shake += 1.5;
           break;
         }
         case 'shipHit':
-          this.push({ kind: 'shipHit', x: e.x, y: e.y, t0: now, life: 0.32, col: C.white, seed: this.seed++, size: 0.5 + Math.min(1.2, e.damage * 0.1) });
-          shake += e.player === me ? 3 : 1.5;
+          this.push({ kind: 'shipHit', x: e.x, y: e.y, t0: now, life: e.damage >= 3 ? 0.6 : 0.32, col: C.white, seed: this.seed++, size: 0.6 + Math.min(2.5, e.damage * 0.25) });
+          shake += (e.player === me ? 3 : 1.5) + Math.min(6, e.damage * 0.5);
           break;
         case 'shipDestroyed':
           this.push({ kind: 'shipDestroyed', x: e.x, y: e.y, t0: now, life: 1.6, col: e.player === me ? C.me : C.foe, seed: this.seed++, size: 1 });

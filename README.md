@@ -22,11 +22,11 @@ Open the printed URL. Landscape works best; the battlefield is letterboxed on ot
 | --- | --- | --- |
 | Aim and fire | Drag anywhere (pull back like a slingshot), release | Same |
 | Choose munition | Click a chip, or keys 1 2 3 | Tap a chip |
-| Ignite early | IGNITE button, or Space | Tap IGNITE |
+| Split early | Tap anywhere, the SPLIT button, or Space | Tap anywhere |
 | Move your ship | Drag starting on your ship | Same |
 | Zoom | Mouse wheel | Pinch |
 | Pan | Right-button drag | Two-finger drag |
-| Director camera | AUTO CAM chip, or C | Tap AUTO CAM |
+| Director camera (on by default) | AUTO CAM chip, or C | Tap AUTO CAM |
 | Reset view | R | |
 
 Munitions: ×5 is unlimited with a 2 s cooldown, ×10 has 10 shots and a 5 s cooldown, ×20 has

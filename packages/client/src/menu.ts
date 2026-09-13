@@ -53,7 +53,7 @@ export class MenuScreen implements Screen {
       text(ctx, DIFFS[i].toUpperCase(), r.x + r.w / 2, r.y + r.h / 2, 13, sel ? C.hud : C.hudDim);
     }
     this.button(ctx, ONLINE, 'ONLINE', 'coming in a later build', false, true);
-    text(ctx, 'drag anywhere to aim · drag your ship to move · 1 2 3 select ammo · space ignites', LW / 2, LH - 28, 13, C.hudDim, 500);
+    text(ctx, 'pull back anywhere to aim · tap to split early · drag your ship to move · 1 2 3 select ammo', LW / 2, LH - 28, 13, C.hudDim, 500);
   }
 
   private button(ctx: CanvasRenderingContext2D, r: Rect, label: string, sub: string, filled: boolean, dim = false): void {

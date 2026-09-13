@@ -43,7 +43,9 @@ export function chipHit(x: number, y: number): MunitionKind | null {
 export interface HudState {
   ship: Ship;
   selected: MunitionKind;
-  showIgnite: boolean;
+  igniteActive: boolean;
+  /** 0..1 pulse phase for the active ignite button. */
+  pulse: number;
   autoCam: boolean;
   fuelAlpha: number;
   fuelCost: number;
@@ -84,16 +86,26 @@ export function drawHud(ctx: CanvasRenderingContext2D, s: HudState): void {
     ctx.restore();
   }
 
-  if (s.showIgnite) {
+  {
     const { x, y } = HUD.ignite;
+    const on = s.igniteActive;
     ctx.save();
     ctx.translate(x, y);
-    ctx.fillStyle = `rgba(${C.meRgb},0.16)`;
+    if (on) {
+      ctx.strokeStyle = `rgba(${C.meRgb},${0.5 * (1 - s.pulse)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, IGNITE_R + 4 + s.pulse * 16, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(${C.meRgb},0.22)`;
+      ctx.beginPath();
+      ctx.arc(0, 0, IGNITE_R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = on ? C.me : C.hudFaint;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(0, 0, IGNITE_R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = C.me;
-    ctx.lineWidth = 2;
     ctx.stroke();
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
@@ -102,7 +114,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, s: HudState): void {
       ctx.lineTo(Math.cos(a) * 15, Math.sin(a) * 15);
       ctx.stroke();
     }
-    text(ctx, 'IGNITE', 0, 50, 12, C.hud);
+    text(ctx, on ? 'TAP TO SPLIT' : 'SPLIT', 0, 50, 12, on ? C.hud : C.hudFaint);
     ctx.restore();
   }
 

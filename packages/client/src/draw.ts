@@ -81,25 +81,139 @@ export function drawShell(
   vx: number,
   vy: number,
   col: string,
+  rgb: string,
   r: number,
   trail: number,
 ): void {
   const sp = Math.hypot(vx, vy) || 1;
-  const tx = x - (vx / sp) * trail;
-  const ty = y - (vy / sp) * trail;
-  const g = ctx.createLinearGradient(x, y, tx, ty);
-  g.addColorStop(0, col);
-  g.addColorStop(1, 'rgba(0,0,0,0)');
+  const ux = vx / sp;
+  const uy = vy / sp;
+  // Soft wide exhaust behind a bright core, so a stream of children reads as a stream.
+  const g = ctx.createLinearGradient(x, y, x - ux * trail, y - uy * trail);
+  g.addColorStop(0, `rgba(${rgb},0.55)`);
+  g.addColorStop(1, `rgba(${rgb},0)`);
   ctx.strokeStyle = g;
-  ctx.lineWidth = r * 0.8;
+  ctx.lineWidth = r * 2.2;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.lineTo(tx, ty);
+  ctx.lineTo(x - ux * trail, y - uy * trail);
   ctx.stroke();
   ctx.fillStyle = col;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = C.white;
+  ctx.beginPath();
+  ctx.arc(x + ux * r * 0.3, y + uy * r * 0.3, r * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** An unsplit shell drawn as a tight bundle of missiles flying in formation. */
+export function drawBundle(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  vx: number,
+  vy: number,
+  col: string,
+  rgb: string,
+  count: number,
+): void {
+  const sp = Math.hypot(vx, vy) || 1;
+  const ux = vx / sp;
+  const uy = vy / sp;
+  const px = -uy;
+  const py = ux;
+  const n = Math.min(6, Math.max(2, count));
+  const offsets: Array<[number, number]> = [
+    [0, 0],
+    [-9, 5],
+    [-9, -5],
+    [-18, 2],
+    [-18, -8],
+    [-27, -3],
+  ];
+  const g = ctx.createLinearGradient(x, y, x - ux * 70, y - uy * 70);
+  g.addColorStop(0, `rgba(${rgb},0.5)`);
+  g.addColorStop(1, `rgba(${rgb},0)`);
+  ctx.strokeStyle = g;
+  ctx.lineWidth = 18;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - ux * 6, y - uy * 6);
+  ctx.lineTo(x - ux * 70, y - uy * 70);
+  ctx.stroke();
+  for (let i = 0; i < n; i++) {
+    const [a, b] = offsets[i];
+    const cx = x + ux * a + px * b;
+    const cy = y + uy * a + py * b;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = C.white;
+    ctx.beginPath();
+    ctx.arc(cx + ux * 1.2, cy + uy * 1.2, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/** Filled fan between two boundary paths (the outermost children of a split). */
+export function drawCone(ctx: CanvasRenderingContext2D, left: Pt[], right: Pt[], fill: string, edge: string): void {
+  if (left.length < 2 || right.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(left[0].x, left[0].y);
+  for (const p of left) ctx.lineTo(p.x, p.y);
+  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.moveTo(left[0].x, left[0].y);
+  for (const p of left) ctx.lineTo(p.x, p.y);
+  ctx.moveTo(right[0].x, right[0].y);
+  for (const p of right) ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+export function drawPath(ctx: CanvasRenderingContext2D, pts: Pt[], col: string, width: number): void {
+  if (pts.length < 2) return;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (const p of pts) ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+}
+
+/** Launch direction and power, drawn at the muzzle while aiming. */
+export function drawLaunchArrow(ctx: CanvasRenderingContext2D, x: number, y: number, vx: number, vy: number, power: number, col: string): void {
+  const sp = Math.hypot(vx, vy) || 1;
+  const ux = vx / sp;
+  const uy = vy / sp;
+  const len = 34 + 56 * power;
+  const ex = x + ux * len;
+  const ey = y + uy * len;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(ex + ux * 10, ey + uy * 10);
+  ctx.lineTo(ex - uy * 6, ey + ux * 6);
+  ctx.lineTo(ex + uy * 6, ey - ux * 6);
+  ctx.closePath();
   ctx.fill();
 }
 
@@ -229,8 +343,8 @@ export function drawDebris(ctx: CanvasRenderingContext2D, d: Debris, maxHp: numb
 
 export function drawDragUI(ctx: CanvasRenderingContext2D, sx: number, sy: number, cx: number, cy: number, col: string): void {
   ctx.strokeStyle = col;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 5]);
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([6, 6]);
   ctx.beginPath();
   ctx.moveTo(sx, sy);
   ctx.lineTo(cx, cy);

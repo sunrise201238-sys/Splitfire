@@ -121,7 +121,7 @@ export class Camera {
       if (pts.length > 0) {
         const bw = x1 - x0 + 320;
         const bh = y1 - y0 + 260;
-        nz = clampZoom(Math.min(LW / bw, LH / bh, 2.4));
+        nz = clampZoom(Math.min(LW / bw, LH / bh, 1.7));
         nx = (x0 + x1) / 2;
         ny = (y0 + y1) / 2;
       }
@@ -143,7 +143,12 @@ export class Camera {
 
   private interestPoints(world: World, effects: Effects, now: number): Pt[] {
     const pts: Pt[] = [];
-    for (const s of world.shells) pts.push({ x: s.x, y: s.y });
+    for (const s of world.shells) {
+      pts.push({ x: s.x, y: s.y });
+      // Keep the ship a stream is flying toward in frame, so the viewer sees where it lands.
+      const target = world.ships[s.owner === 0 ? 1 : 0];
+      pts.push({ x: target.x, y: target.y - 50 }, { x: target.x, y: target.y + 40 });
+    }
     for (const e of effects.list) {
       if (now - e.t0 > 0.7) continue;
       if (e.kind === 'split' || e.kind === 'shipHit' || e.kind === 'shipDestroyed' || e.kind === 'annihilate') {

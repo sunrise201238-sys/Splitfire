@@ -4,12 +4,15 @@ import {
   DEBRIS_HP,
   DT,
   FUEL_PER_UNIT,
+  MAX_LAUNCH_SPEED,
   MIN_LAUNCH_SPEED,
   MUNITIONS,
   MUNITION_KINDS,
   SHIP_HULL,
+  clampLaunch,
   clampToBounds,
   createWorld,
+  launchPoint,
   predictCrossing,
   previewShot,
   step,
@@ -21,14 +24,15 @@ import {
   type World,
 } from '@splitfire/sim';
 import { Camera } from './camera';
-import { drawDebris, drawDotted, drawDragUI, drawEdgeArrow, drawHpBar, drawShell, drawShip, drawSplitMarker, roundRect, text } from './draw';
+import { drawBundle, drawCone, drawDebris, drawDotted, drawDragUI, drawEdgeArrow, drawHpBar, drawLaunchArrow, drawPath, drawShell, drawShip, drawSplitMarker, roundRect, text } from './draw';
 import { Effects } from './effects';
 import { HUD, IGNITE_R, chipHit, drawHud, inCircle, inRect, type Rect } from './hud';
 import { C, LH, LW } from './palette';
 import type { App, PointerInfo, Screen } from './screen';
 import { Starfield } from './starfield';
 
-const AIM_SCALE = 2.6;
+const AIM_SCALE = 1.6;
+const HINT_SHOTS = 3;
 const MIN_DRAG = 12;
 const SHIP_GRAB_RADIUS = 52;
 const MAX_TICKS_PER_FRAME = 6;
@@ -67,6 +71,8 @@ export class MatchScreen implements Screen {
   private fuelVisibleUntil = 0;
   private overAt: number | null = null;
   private now = 0;
+  private shotsFired = 0;
+  private lastFireAt = -10;
 
   constructor(
     private readonly app: App,
@@ -75,6 +81,15 @@ export class MatchScreen implements Screen {
   ) {
     this.world = createWorld(seed);
     this.bot = createBot(1, difficulty, seed ^ 0x5f3759df);
+    this.camera.setAuto(true);
+  }
+
+  private hasUnsplit(): boolean {
+    return this.world.shells.some((s) => s.owner === this.me && s.parent);
+  }
+
+  private ignite(): void {
+    if (this.hasUnsplit()) this.queue({ type: 'ignite', player: this.me });
   }
 
   private get ship() {
@@ -111,6 +126,10 @@ export class MatchScreen implements Screen {
     const shake = this.effects.spawn(this.world.events, now, this.me);
     if (shake > 0) this.camera.addShake(shake);
     for (const e of this.world.events) {
+      if (e.type === 'fire' && e.player === this.me) {
+        this.shotsFired++;
+        this.lastFireAt = now;
+      }
       if (e.type === 'moveStart' && e.player === this.me) this.fuelVisibleUntil = Infinity;
       if (e.type === 'moveEnd' && e.player === this.me) this.fuelVisibleUntil = now + 1.5;
     }
@@ -207,25 +226,47 @@ export class MatchScreen implements Screen {
     }
 
     for (const s of w.shells) {
-      const col = s.owner === this.me ? C.me : C.foe;
+      const mine = s.owner === this.me;
+      const col = mine ? C.me : C.foe;
+      const rgb = mine ? C.meRgb : C.foeRgb;
       const x = s.x + s.vx * ex;
       const y = s.y + s.vy * ex;
-      if (s.parent) drawShell(ctx, x, y, s.vx, s.vy, col, s.radius, 34);
-      else drawShell(ctx, x, y, s.vx, s.vy, col, CHILD_RADIUS, 20);
+      if (s.parent) drawBundle(ctx, x, y, s.vx, s.vy, col, rgb, s.mass);
+      else drawShell(ctx, x, y, s.vx, s.vy, col, rgb, CHILD_RADIUS, 34);
     }
 
     this.effects.draw(ctx, now);
 
     const pv = this.currentPreview();
-    if (pv) {
-      drawDotted(ctx, pv.path, C.me, 7, 1.8);
-      for (const cp of pv.children) drawDotted(ctx, cp, `rgba(${C.meRgb},0.35)`, 9, 1.2);
-      if (pv.apex) drawSplitMarker(ctx, pv.apex.x, pv.apex.y, pv.blocked ? C.amber : C.me);
+    if (pv && this.drag?.mode === 'aim') {
+      const av = this.aimVelocity(this.drag);
+      const v = clampLaunch(av.vx, av.vy);
+      const power = (Math.hypot(v.vx, v.vy) - MIN_LAUNCH_SPEED) / (MAX_LAUNCH_SPEED - MIN_LAUNCH_SPEED);
+      const lp = launchPoint(this.ship);
+      // Fan envelope first, so the parent path and markers sit on top of it.
+      if (pv.envelope) {
+        drawCone(ctx, pv.envelope.top, pv.envelope.bottom, `rgba(${C.meRgb},0.12)`, `rgba(${C.meRgb},0.5)`);
+      }
+      drawPath(ctx, pv.path, `rgba(${C.meRgb},0.9)`, 2.5);
+      drawLaunchArrow(ctx, lp.x, lp.y, v.vx, v.vy, power, C.me);
+      if (pv.apex) {
+        drawSplitMarker(ctx, pv.apex.x, pv.apex.y, pv.blocked ? C.amber : C.me);
+        text(ctx, pv.blocked ? 'BLOCKED' : 'SPLIT', pv.apex.x, pv.apex.y - 28, 12, pv.blocked ? C.amber : C.me);
+      }
       if (pv.landing) {
-        ctx.fillStyle = `rgba(${C.meRgb},0.16)`;
+        const { x0, x1, y } = pv.landing;
+        ctx.fillStyle = `rgba(${C.meRgb},0.2)`;
         ctx.beginPath();
-        ctx.ellipse((pv.landing.x0 + pv.landing.x1) / 2, pv.landing.y + 6, (pv.landing.x1 - pv.landing.x0) / 2 + 24, 26, 0, 0, Math.PI * 2);
+        ctx.ellipse((x0 + x1) / 2, y + 6, (x1 - x0) / 2 + 24, 26, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = C.me;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x0 - 12, y + 44);
+        ctx.lineTo(x0 - 12, y + 36);
+        ctx.lineTo(x1 + 12, y + 36);
+        ctx.lineTo(x1 + 12, y + 44);
+        ctx.stroke();
       }
     }
     ctx.restore();
@@ -240,14 +281,20 @@ export class MatchScreen implements Screen {
       const t = clampToBounds(this.ship.bounds, this.drag.cx, this.drag.cy);
       fuelCost = (Math.hypot(t.x - this.ship.x, t.y - this.ship.y) * FUEL_PER_UNIT) / this.ship.maxFuel;
     }
+    const unsplit = this.hasUnsplit();
     drawHud(ctx, {
       ship: this.ship,
       selected: this.selected,
-      showIgnite: w.shells.some((s) => s.owner === this.me && s.parent),
+      igniteActive: unsplit,
+      pulse: (now * 1.4) % 1,
       autoCam: this.camera.auto,
       fuelAlpha: showFuel ? 1 : 0,
       fuelCost,
     });
+    if (unsplit && this.shotsFired <= HINT_SHOTS && now - this.lastFireAt < 4) {
+      const a = 0.6 + 0.4 * Math.sin(now * 6);
+      text(ctx, 'tap anywhere to split early', LW / 2, HUD.ignite.y - IGNITE_R - 26, 16, `rgba(230,233,245,${a})`, 600);
+    }
 
     if (this.overAt !== null && now - this.overAt > OVERLAY_DELAY) this.drawOverlay(ctx);
   }
@@ -319,8 +366,8 @@ export class MatchScreen implements Screen {
       this.selected = kind;
       return;
     }
-    if (inCircle(HUD.ignite.x, HUD.ignite.y, IGNITE_R + 8, p.x, p.y) && this.world.shells.some((s) => s.owner === this.me && s.parent)) {
-      this.queue({ type: 'ignite', player: this.me });
+    if (inCircle(HUD.ignite.x, HUD.ignite.y, IGNITE_R + 8, p.x, p.y)) {
+      this.ignite();
       return;
     }
     if (inRect(HUD.cam, p.x, p.y)) {
@@ -390,7 +437,11 @@ export class MatchScreen implements Screen {
     if (!d || d.id !== p.id) return;
     this.drag = null;
     if (d.mode === 'aim') {
-      if (Math.hypot(d.sx - d.cx, d.sy - d.cy) < MIN_DRAG) return;
+      if (Math.hypot(d.sx - d.cx, d.sy - d.cy) < MIN_DRAG) {
+        // A tap, not a drag: split whatever is still in one piece.
+        this.ignite();
+        return;
+      }
       const v = this.aimVelocity(d);
       if (Math.hypot(v.vx, v.vy) < MIN_LAUNCH_SPEED * 0.6) return;
       this.queue({ type: 'fire', player: this.me, kind: this.selected, vx: v.vx, vy: v.vy });
@@ -414,7 +465,7 @@ export class MatchScreen implements Screen {
         break;
       case 'Space':
         if (this.overAt !== null && this.now - this.overAt > OVERLAY_DELAY) this.app.show(new MatchScreen(this.app, this.difficulty));
-        else this.queue({ type: 'ignite', player: this.me });
+        else this.ignite();
         break;
       case 'KeyC':
         this.camera.setAuto(!this.camera.auto);

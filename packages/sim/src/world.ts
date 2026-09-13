@@ -1,17 +1,17 @@
 import { clamp, len, rotate } from './dmath';
-import { CHILD_MASS, CHILD_RADIUS, DT, MUNITIONS, type MunitionKind } from './munitions';
+import { CHILD_MASS, CHILD_RADIUS, DT, MUNITIONS, STREAM_SPEED_SPREAD, type MunitionKind } from './munitions';
 import { WORLD_H, WORLD_W, integrate, outOfField } from './physics';
 import { createRng, rngInt, rngRange } from './rng';
 import type { Bounds, Debris, Input, PlayerId, Shell, Ship, World } from './types';
 
-export const SHIP_MAX_HP = 50;
+export const SHIP_MAX_HP = 80;
 export const SHIP_MAX_FUEL = 100;
 export const SHIP_MOVE_SPEED = 70; // units per second
 export const FUEL_PER_UNIT = 0.25; // fuel spent per unit of distance
 export const SHIP_LAUNCH_OFFSET_Y = -38;
-export const MIN_LAUNCH_SPEED = 150;
-export const MAX_LAUNCH_SPEED = 700;
-export const GRAVITY = 260;
+export const MIN_LAUNCH_SPEED = 110;
+export const MAX_LAUNCH_SPEED = 430;
+export const GRAVITY = 120;
 
 /** Ship hull approximated by three circles: [offsetX, offsetY, radius]. */
 export const SHIP_HULL: ReadonlyArray<readonly [number, number, number]> = [
@@ -93,10 +93,15 @@ export function clampToBounds(b: Bounds, x: number, y: number): { x: number; y: 
   return { x: clamp(x, b.x0, b.x1), y: clamp(y, b.y0, b.y1) };
 }
 
-/** Speed multiplier pattern for child i of n. Deterministic and preview-friendly. */
-export function childSpeedMul(i: number): number {
-  const k = i % 3;
-  return k === 0 ? 1 : k === 1 ? 1.06 : 0.94;
+/**
+ * Speed multiplier for child i of n. Speeds are spread evenly across the fan but
+ * decorrelated from the angle (stride 7 is coprime with 5, 10 and 20), so the
+ * fan reads as a stream rather than a diagonal line. Deterministic and preview-friendly.
+ */
+export function childSpeedMul(i: number, n: number): number {
+  if (n <= 1) return 1;
+  const rank = (i * 7) % n;
+  return 1 - STREAM_SPEED_SPREAD / 2 + (STREAM_SPEED_SPREAD * rank) / (n - 1);
 }
 
 /** Child velocities for a shell split with the given remaining mass. */
@@ -109,12 +114,18 @@ export function childVelocities(
   const def = MUNITIONS[kind];
   const out: Array<{ vx: number; vy: number }> = [];
   for (let i = 0; i < count; i++) {
-    const a = count === 1 ? 0 : (i / (count - 1) - 0.5) * def.spread;
-    const r = rotate(vx, vy, a);
-    const m = childSpeedMul(i);
+    const r = rotate(vx, vy, childAngle(def.spread, i, count));
+    const m = childSpeedMul(i, count);
     out.push({ vx: r.x * m, vy: r.y * m });
   }
   return out;
+}
+
+/** Angle of child i of n relative to the parent's heading, with a small deterministic jitter so the fan is not a grid. */
+export function childAngle(spread: number, i: number, n: number): number {
+  if (n <= 1) return 0;
+  const jitter = (((i * 5) % 9) - 4) * 0.004;
+  return (i / (n - 1) - 0.5) * spread + jitter;
 }
 
 function splitShell(world: World, shell: Shell, out: Shell[]): void {

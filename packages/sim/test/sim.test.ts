@@ -19,12 +19,12 @@ function run(world: World, script: Record<number, Input[]>, ticks: number): void
 }
 
 const volley: Record<number, Input[]> = {
-  1: [{ type: 'fire', player: 0, kind: 'x10', vx: 300, vy: -330 }],
+  1: [{ type: 'fire', player: 0, kind: 'x10', vx: 200, vy: -220 }],
   2: [{ type: 'move', player: 1, x: 900, y: 300 }],
-  30: [{ type: 'fire', player: 1, kind: 'x5', vx: -300, vy: -330 }],
-  75: [{ type: 'fire', player: 0, kind: 'x20', vx: 292, vy: -324 }],
+  30: [{ type: 'fire', player: 1, kind: 'x5', vx: -200, vy: -220 }],
+  75: [{ type: 'fire', player: 0, kind: 'x20', vx: 195, vy: -216 }],
   76: [{ type: 'ignite', player: 0 }],
-  200: [{ type: 'fire', player: 1, kind: 'x20', vx: -292, vy: -324 }],
+  200: [{ type: 'fire', player: 1, kind: 'x20', vx: -195, vy: -216 }],
 };
 
 describe('deterministic math', () => {
@@ -58,13 +58,13 @@ describe('determinism', () => {
 describe('firing', () => {
   it('spends ammo and starts the cooldown', () => {
     const w = createWorld(7);
-    step(w, [{ type: 'fire', player: 0, kind: 'x10', vx: 300, vy: -300 }]);
+    step(w, [{ type: 'fire', player: 0, kind: 'x10', vx: 200, vy: -200 }]);
     expect(w.ships[0].ammo.x10).toBe(9);
     expect(w.ships[0].cooldown).toBe(MUNITIONS.x10.cooldownTicks - 1);
     expect(w.shells.length).toBe(1);
     expect(w.shells[0].mass).toBe(10);
     // Blocked while cooling down.
-    step(w, [{ type: 'fire', player: 0, kind: 'x5', vx: 300, vy: -300 }]);
+    step(w, [{ type: 'fire', player: 0, kind: 'x5', vx: 200, vy: -200 }]);
     expect(w.shells.length).toBe(1);
     expect(w.ships[0].ammo.x10).toBe(9);
   });
@@ -72,7 +72,7 @@ describe('firing', () => {
   it('refuses finite munitions once they run out', () => {
     const w = createWorld(7);
     w.ships[0].ammo.x20 = 0;
-    step(w, [{ type: 'fire', player: 0, kind: 'x20', vx: 300, vy: -300 }]);
+    step(w, [{ type: 'fire', player: 0, kind: 'x20', vx: 200, vy: -200 }]);
     expect(w.shells.length).toBe(0);
   });
 });
@@ -80,7 +80,7 @@ describe('firing', () => {
 describe('cluster split', () => {
   it('splits at the apex into the full child count', () => {
     const w = createWorld(3);
-    step(w, [{ type: 'fire', player: 0, kind: 'x10', vx: 250, vy: -300 }]);
+    step(w, [{ type: 'fire', player: 0, kind: 'x10', vx: 170, vy: -200 }]);
     let splitEvent = null;
     for (let t = 0; t < 120 && !splitEvent; t++) {
       step(w, []);
@@ -97,7 +97,7 @@ describe('cluster split', () => {
 
   it('ignites early on request', () => {
     const w = createWorld(3);
-    step(w, [{ type: 'fire', player: 0, kind: 'x5', vx: 250, vy: -300 }]);
+    step(w, [{ type: 'fire', player: 0, kind: 'x5', vx: 170, vy: -200 }]);
     step(w, []);
     step(w, [{ type: 'ignite', player: 0 }]);
     expect(w.events.some((e) => e.type === 'split')).toBe(true);
@@ -106,9 +106,9 @@ describe('cluster split', () => {
 
   it('preview matches the simulated apex', () => {
     const w = createWorld(3);
-    const pv = previewShot(w, 0, 250, -300, 'x10');
+    const pv = previewShot(w, 0, 170, -200, 'x10');
     expect(pv.apex).not.toBeNull();
-    step(w, [{ type: 'fire', player: 0, kind: 'x10', vx: 250, vy: -300 }]);
+    step(w, [{ type: 'fire', player: 0, kind: 'x10', vx: 170, vy: -200 }]);
     let split: { x: number; y: number } | null = null;
     for (let t = 0; t < 120 && !split; t++) {
       step(w, []);

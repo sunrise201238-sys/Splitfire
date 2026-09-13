@@ -21,8 +21,13 @@ fire cancel each other out. Everything else is redesigned for a space setting.
 - **Fixed gravity** pulls shells toward the bottom of the screen (the planet below). Aim is a
   pull-back drag; the preview shows the arc, the split point, the child fan and the landing band.
 - **Cluster munitions** replace the multiplier gates. A shell splits into children at the apex of
-  its arc by default; the player can ignite it earlier. Early splits spread wider by the time they
-  arrive (a wall to intercept with); apex splits stay tighter (a punch).
+  its arc by default; the player can split it earlier with a tap anywhere. Early splits spread
+  wider by the time they arrive (a wall to intercept with); apex splits stay tighter (a punch).
+- **Streams, not walls.** The fan is narrow (0.2 to 0.36 rad) and the children fly at speeds
+  spread across ±20% of the parent's, so a split strings out along the path like the missile
+  streams in the original clip. An unsplit shell is drawn as a bundle of missiles in formation.
+- **Tempo.** Gravity 120 and launch speeds 110 to 430 give a flight of roughly four seconds, with
+  the director camera on by default so streams are followed at a modest zoom.
 - **Annihilation**: opposing shells that touch cancel mass for mass. An unsplit shell's mass is
   its child count; children have mass 1. Whatever survives hits the enemy hull for its mass.
 - **Ammo and cooldown**: ×5 unlimited / 2 s, ×10 ten shots / 5 s, ×20 five shots / 10 s. One
@@ -53,17 +58,21 @@ One deterministic simulation core, three input sources: local human, local bot, 
 
 ## Camera
 
-Default is the full battlefield. The player can zoom (wheel, pinch) and pan (right drag,
-two-finger drag); any manual camera input leaves director mode. Director mode ("AUTO CAM") frames
-the union of interesting things: shells in flight, recent splits, annihilation sparks, hull hits,
-with hysteresis and a minimum dwell so it does not jitter. While the player is aiming, the
+Director mode ("AUTO CAM") is on by default and frames the union of interesting things: shells
+in flight and the ship they fly toward, recent splits, annihilation sparks, hull hits, with
+hysteresis and a minimum dwell so it does not jitter. Zoom is capped at 1.7 so the field never
+disappears. The player can zoom (wheel, pinch) and pan (right drag, two-finger drag); any manual
+camera input leaves director mode. While the player is aiming, the
 director frames the preview instead. Off-screen enemy shells get edge arrows when zoomed in.
 
 ## Visual rules
 
 - Three colors: you (blue), enemy (red), neutral. No textures, no text during play.
-- Progressive disclosure: the IGNITE button only exists while you have an unsplit shell in the
-  air; the fuel bar only appears while moving or dragging your ship.
+- The SPLIT button is always present but only lights up (and pulses) while you have an unsplit
+  shell in the air; a hint under it explains the tap for the first three shots. The fuel bar only
+  appears while moving or dragging your ship.
+- The aim preview is one solid arc to a labelled split point, a filled fan showing everything the
+  split can reach, and a bracket at the enemy's altitude for where the children land.
 - Mockups that set the style live in `docs/mockups/`.
 
 ## Online plan (not built yet)
@@ -78,6 +87,7 @@ mirrored so everyone sees themselves on the left in blue.
 
 ## Open tuning questions
 
-- Ship HP (50), child damage (1), fuel (100 at 0.25 per unit) and debris HP (8) are placeholders.
+- Ship HP (80), child damage (1), fuel (100 at 0.25 per unit) and debris HP (8) are placeholders.
+  Bot-vs-bot matches run 80 to 145 s with these values.
 - Whether ×10 and ×20 need equal-or-better throughput than ×5 to feel worth spending.
 - Whether debris should also damage ships on contact.

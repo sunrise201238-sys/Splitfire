@@ -23,12 +23,19 @@ const sec = (s: number) => Math.round(s * TICK_RATE);
  * Munition table. New kinds (and future exotic weapons) are rows here, not code.
  */
 export const MUNITIONS: Record<MunitionKind, MunitionDef> = {
-  x5: { kind: 'x5', children: 5, cooldownTicks: sec(2), ammo: null, spread: 0.55, radius: 7 },
-  x10: { kind: 'x10', children: 10, cooldownTicks: sec(5), ammo: 10, spread: 0.8, radius: 8 },
-  x20: { kind: 'x20', children: 20, cooldownTicks: sec(10), ammo: 5, spread: 1.05, radius: 9 },
+  x5: { kind: 'x5', children: 5, cooldownTicks: sec(2), ammo: null, spread: 0.2, radius: 7 },
+  x10: { kind: 'x10', children: 10, cooldownTicks: sec(5), ammo: 10, spread: 0.28, radius: 8 },
+  x20: { kind: 'x20', children: 20, cooldownTicks: sec(10), ammo: 5, spread: 0.36, radius: 9 },
 };
 
 export const MUNITION_KINDS: MunitionKind[] = ['x5', 'x10', 'x20'];
 
 export const CHILD_RADIUS = 4;
 export const CHILD_MASS = 1;
+
+/**
+ * Children of a split fly at different speeds so the fan strings out along the path
+ * like a stream of missiles rather than a wall. The slowest child flies at
+ * (1 - STREAM_SPEED_SPREAD / 2) of the parent's speed, the fastest at (1 + ... / 2).
+ */
+export const STREAM_SPEED_SPREAD = 0.4;
